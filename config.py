@@ -1,1 +1,1 @@
-token = "NzE4ODQzMTg0MTIxMjQ5ODEy.XtuyOg.Qw-PhxbMcTF8slc4mNeSMHO75J4"
+token = "AlterToken"
