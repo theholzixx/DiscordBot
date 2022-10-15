@@ -5,7 +5,10 @@ import asyncio
 
 from Music.verwaltung import verwaltung
 
-bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"), intents=discord.Intents.default())
+intents = discord.Intents.default()
+intents.message_content = True
+
+bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"), intents=intents)
 
 import hi, moin, helfer, zeit, ping, looper, jokes, music
 
