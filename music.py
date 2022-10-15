@@ -1,4 +1,5 @@
 from __main__ import bot
+from enum import Flag
 from discord.ext import commands
 import asyncio
 from time import sleep
@@ -6,9 +7,12 @@ import youtube_dl
 import discord
 import validators
 
+Waitlist = []
+admin = False
+
 ytdl_format_options = {
     'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+    'outtmpl': '/Downloads/%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
     'noplaylist': True,
     'nocheckcertificate': True,
@@ -48,13 +52,42 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 @bot.command()
+async def Next(ctx):
+    print("next wurde auch aufgerufen")
+    if len(Waitlist) == 0:
+        await ctx.send("No more songs in Waitlist.")        
+    else:
+        await ctx.send("Next song.")
+        url = Waitlist[0]
+        del Waitlist[0]
+        player = await YTDLSource.from_url(url, loop=False)
+        if ctx.voice_client.is_playing():
+            ctx.voice_client.stop()
+        ctx.voice_client.play(player, after=next_song(ctx))
+
+def next_song(ctx):
+    print("Next song")
+    Next(ctx)
+    print("Again")
+
+@bot.command()
 async def Play(ctx):
     """Plays a Song(If YT URL is provided)"""
     # Gets voice channel of message author
-    urlA = ctx.message.content.split(' ', 2)
+    urlA = ctx.message.content.split(' ')
 
     if len(urlA) == 3:
+        await ctx.send("nichtNow")
         url = urlA[2]
+        admin = False
+    elif len(urlA) == 4 and urlA[2] == "now":
+        await ctx.send("NOW")
+        url = urlA[3]
+        if ctx.message.author.guild_permissions.administrator:
+            admin = True
+        else:
+            admin = False
+            await ctx.send("Not an admin.")
     else:
         url = None
 
@@ -62,15 +95,24 @@ async def Play(ctx):
     if voice_channel != None:
         vc = ctx.voice_client
         if url != None:
-            #hier kommt YT code
             if not validators.url(url):
                 await ctx.send("not a valid url")
             else:
-                async with ctx.typing():
-                    player = await YTDLSource.from_url(url, loop=False)
-                    vc.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
+                if admin or not ctx.voice_client.is_playing():
+                    admin = False
+                    async with ctx.typing():
+                        player = await YTDLSource.from_url(url, loop=False)
+                        if ctx.voice_client.is_playing():
+                            vc.stop()
+                        vc.play(player, after=next_song(ctx))
 
-                await ctx.send(f'Now playing: {player.title}')
+                    await ctx.send(f'Now playing: {player.title}')
+                else:
+                    #Add to Waitlist
+                    await YTDLSource.from_url(url, loop=False)
+                    Waitlist.append(url)
+                    await ctx.send("Song added to Waitlist.")
+
         else:
             vc.play(discord.FFmpegPCMAudio(executable="C:/Program Files/ffmpeg-2022-10-13-git-9e8a327e68-full_build/bin/ffmpeg.exe",
             source="C:/Users/hendr/Nextcloud/Musik/coole musik/Frozen Night - II- The Ethereal Forest/Frozen Night - II- The Ethereal Forest - 03 Chrysalis Metamorphosis.mp3"))
@@ -87,6 +129,16 @@ async def Stop(ctx):
     else:
         await ctx.send("I am not connected to any voice channel on this server!")
 
+@bot.command()
+async def DelQ(ctx):
+    #if ctx.author.voice.channel == ctx.voice_client:
+        print(Waitlist)
+        Waitlist = []
+        print(Waitlist)
+        await ctx.send("Waitlist deleted!")
+    #else:
+        #await ctx.send("Not in same Voicechannel!")
+
 @Play.before_invoke
 async def ensure_voice(ctx):
     if ctx.voice_client is None:
@@ -95,5 +147,5 @@ async def ensure_voice(ctx):
         else:
             await ctx.send("You are not connected to a voice channel.")
             raise commands.CommandError("Author not connected to a voice channel.")
-    elif ctx.voice_client.is_playing():
-        ctx.voice_client.stop()
+    #elif ctx.voice_client.is_playing():
+        #await ctx.send("Changing Song")

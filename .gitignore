@@ -1,2 +1,5 @@
 config.py
 *.webm
+*.mp3
+*.m4a
+*.unknown_video
