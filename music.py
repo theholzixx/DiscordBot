@@ -7,8 +7,12 @@ import youtube_dl
 import discord
 import validators
 
+global Waitlist
 Waitlist = []
+global admin
 admin = False
+global Globalctx
+Globalctx = None
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -52,23 +56,23 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 @bot.command()
-async def Next(ctx):
+async def Nexts(ctx):
+    Next(ctx)
+
+def Next(ctx):
     print("next wurde auch aufgerufen")
     if len(Waitlist) == 0:
-        await ctx.send("No more songs in Waitlist.")        
+        print("No more songs in Waitlist.")
+        #await Globalctx.send("No more songs in Waitlist.")        
     else:
-        await ctx.send("Next song.")
-        url = Waitlist[0]
+        print("Next song.")
+        #await Globalctx.send("Next song.")
+        player = Waitlist[0]
         del Waitlist[0]
-        player = await YTDLSource.from_url(url, loop=False)
+        #player = await YTDLSource.from_url(url, loop=bot.loop)
         if ctx.voice_client.is_playing():
             ctx.voice_client.stop()
-        ctx.voice_client.play(player, after=next_song(ctx))
-
-def next_song(ctx):
-    print("Next song")
-    Next(ctx)
-    print("Again")
+        ctx.voice_client.play(player, after=lambda x= None: Next(ctx))
 
 @bot.command()
 async def Play(ctx):
@@ -101,16 +105,15 @@ async def Play(ctx):
                 if admin or not ctx.voice_client.is_playing():
                     admin = False
                     async with ctx.typing():
-                        player = await YTDLSource.from_url(url, loop=False)
+                        player = await YTDLSource.from_url(url, loop=bot.loop)
                         if ctx.voice_client.is_playing():
                             vc.stop()
-                        vc.play(player, after=next_song(ctx))
-
+                        vc.play(player, after=lambda x=None: Next(ctx))
+                        Globalctx = ctx
                     await ctx.send(f'Now playing: {player.title}')
                 else:
                     #Add to Waitlist
-                    await YTDLSource.from_url(url, loop=False)
-                    Waitlist.append(url)
+                    Waitlist.append(await YTDLSource.from_url(url, loop=False))
                     await ctx.send("Song added to Waitlist.")
 
         else:
@@ -119,6 +122,9 @@ async def Play(ctx):
     else:
         await ctx.send(str(ctx.author.name) + "is not in a channel.")
     # Delete command after the audio is done playing.
+
+def Test():
+    print("Nix")
 
 @bot.command()
 async def Stop(ctx):
@@ -138,6 +144,10 @@ async def DelQ(ctx):
         await ctx.send("Waitlist deleted!")
     #else:
         #await ctx.send("Not in same Voicechannel!")
+
+#@Next.before_invoke
+#async def ensure_ctx(ctx):
+#    Globalctx = ctx
 
 @Play.before_invoke
 async def ensure_voice(ctx):
