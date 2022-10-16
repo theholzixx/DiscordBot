@@ -3,7 +3,6 @@ from enum import Flag
 from socket import SO_LINGER
 from discord.ext import commands
 import asyncio
-from time import sleep
 import youtube_dl
 import discord
 import validators
@@ -13,6 +12,9 @@ Waitlist = []
 global admin
 admin = False
 global Song
+Song = None
+global More
+More = False
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -56,41 +58,48 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 @bot.command()
-async def Nexts(ctx):
-    Next(ctx)
+async def Next(ctx):
+    """Plays the Next song in Queue"""
 
-def Next(ctx):
+    global More
+    print("Nextsong command")
+    Next_song(ctx)
+    if not More:
+        await ctx.send("No more songs in Waitlist.")
+
+def Next_S(ctx):
+    loop = asyncio.get_running_loop()
+    loop.create_task(Next_song(ctx))
+
+def Next_song(ctx):
     global Song
     global Waitlist
+    global More
     print("next wurde auch aufgerufen")
     if len(Waitlist) == 0:
+        More = False
         print("No more songs in Waitlist.")
-        Song.title = "No Song Playing"
-        #await Globalctx.send("No more songs in Waitlist.")        
+        if Song is not None:
+            Song.title = "No Song Playing"
     else:
+        More = True
         print("Next song.")
-        #await Globalctx.send("Next song.")
         player = Waitlist[0]
         del Waitlist[0]
-        #player = await YTDLSource.from_url(url, loop=bot.loop)
-        if ctx.voice_client.is_playing():
-            ctx.voice_client.stop()
-        ctx.voice_client.play(player, after=lambda x= None: Next(ctx))
+        ctx.voice_client.play(player, after=lambda x=None: Next_song(ctx))
         Song = player
 
 @bot.command()
 async def Play(ctx):
-    global Waitlist
     """Plays a Song(If YT URL is provided)"""
-    # Gets voice channel of message author
+
+    global Waitlist
     urlA = ctx.message.content.split(' ')
 
     if len(urlA) == 3:
-        #await ctx.send("nichtNow")
         url = urlA[2]
         admin = False
     elif len(urlA) == 4 and urlA[2] == "now":
-        #await ctx.send("NOW")
         url = urlA[3]
         if ctx.message.author.guild_permissions.administrator:
             admin = True
@@ -113,13 +122,14 @@ async def Play(ctx):
                         player = await YTDLSource.from_url(url, loop=bot.loop)
                         if ctx.voice_client.is_playing():
                             vc.stop()
-                        vc.play(player, after=lambda x=None: Next(ctx))
+                        vc.play(player, after=lambda x=None: Next_song(ctx))
                         global Song 
                         Song = player
                     await ctx.send(f'Now playing: {player.title}')
                 else:
                     #Add to Waitlist
-                    Waitlist.append(await YTDLSource.from_url(url, loop=False))
+                    async with ctx.typing():
+                        Waitlist.append(await YTDLSource.from_url(url, loop=False))
                     await ctx.send("Song added to Waitlist.")
 
         else:
@@ -132,21 +142,41 @@ async def Play(ctx):
 
 @bot.command()
 async def Info(ctx):
+    """Showes Title of current Song"""
+
     await ctx.send(f'Now playing: {Song.title}')
 
 @bot.command()
 async def Stop(ctx):
     """Stops and disconnects the bot from voice"""
     
-    if ctx.voice_client is not None:
+    if ctx.voice_client is not None and ctx.author.voice.channel.id == ctx.voice_client.channel.id:
         await ctx.voice_client.disconnect()
+        await DelQ(ctx)
+    elif ctx.author.voice.channel.id != ctx.voice_client.channel.id:
+        await ctx.send("Not in same Voicechannel!")
     else:
         await ctx.send("I am not connected to any voice channel on this server!")
 
 @bot.command()
+async def Queue(ctx):
+    """All Songs in current Queue"""
+
+    if len(Waitlist) != 0:
+        Titel = "Current Queue: \n"
+        for x in range(len(Waitlist)):
+            Titel += str(x + 1) + ": " + Waitlist[x].title + "\n"
+            print(x)
+        await ctx.send(Titel)
+    else:
+        await ctx.send("No Title in Queue.")
+
+@bot.command()
 async def DelQ(ctx):
+    """Delete all Songs from Queue"""
+
     global Waitlist
-    if ctx.author.voice.channel.id == ctx.voice_client.channel.id:
+    if ctx.voice_client is None or ctx.author.voice.channel.id == ctx.voice_client.channel.id:
         print(Waitlist)
         Waitlist = []
         print(Waitlist)
