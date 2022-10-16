@@ -1,5 +1,6 @@
 from __main__ import bot
 from enum import Flag
+from socket import SO_LINGER
 from discord.ext import commands
 import asyncio
 from time import sleep
@@ -11,8 +12,7 @@ global Waitlist
 Waitlist = []
 global admin
 admin = False
-global Globalctx
-Globalctx = None
+global Song
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -60,9 +60,12 @@ async def Nexts(ctx):
     Next(ctx)
 
 def Next(ctx):
+    global Song
+    global Waitlist
     print("next wurde auch aufgerufen")
     if len(Waitlist) == 0:
         print("No more songs in Waitlist.")
+        Song.title = "No Song Playing"
         #await Globalctx.send("No more songs in Waitlist.")        
     else:
         print("Next song.")
@@ -73,19 +76,21 @@ def Next(ctx):
         if ctx.voice_client.is_playing():
             ctx.voice_client.stop()
         ctx.voice_client.play(player, after=lambda x= None: Next(ctx))
+        Song = player
 
 @bot.command()
 async def Play(ctx):
+    global Waitlist
     """Plays a Song(If YT URL is provided)"""
     # Gets voice channel of message author
     urlA = ctx.message.content.split(' ')
 
     if len(urlA) == 3:
-        await ctx.send("nichtNow")
+        #await ctx.send("nichtNow")
         url = urlA[2]
         admin = False
     elif len(urlA) == 4 and urlA[2] == "now":
-        await ctx.send("NOW")
+        #await ctx.send("NOW")
         url = urlA[3]
         if ctx.message.author.guild_permissions.administrator:
             admin = True
@@ -109,7 +114,8 @@ async def Play(ctx):
                         if ctx.voice_client.is_playing():
                             vc.stop()
                         vc.play(player, after=lambda x=None: Next(ctx))
-                        Globalctx = ctx
+                        global Song 
+                        Song = player
                     await ctx.send(f'Now playing: {player.title}')
                 else:
                     #Add to Waitlist
@@ -117,14 +123,16 @@ async def Play(ctx):
                     await ctx.send("Song added to Waitlist.")
 
         else:
-            vc.play(discord.FFmpegPCMAudio(executable="C:/Program Files/ffmpeg-2022-10-13-git-9e8a327e68-full_build/bin/ffmpeg.exe",
-            source="C:/Users/hendr/Nextcloud/Musik/coole musik/Frozen Night - II- The Ethereal Forest/Frozen Night - II- The Ethereal Forest - 03 Chrysalis Metamorphosis.mp3"))
+            await ctx.send("Please provide a url.")
+            #vc.play(discord.FFmpegPCMAudio(executable="C:/Program Files/ffmpeg-2022-10-13-git-9e8a327e68-full_build/bin/ffmpeg.exe",
+            #source="C:/Users/hendr/Nextcloud/Musik/coole musik/Frozen Night - II- The Ethereal Forest/Frozen Night - II- The Ethereal Forest - 03 Chrysalis Metamorphosis.mp3"))
     else:
         await ctx.send(str(ctx.author.name) + "is not in a channel.")
     # Delete command after the audio is done playing.
 
-def Test():
-    print("Nix")
+@bot.command()
+async def Info(ctx):
+    await ctx.send(f'Now playing: {Song.title}')
 
 @bot.command()
 async def Stop(ctx):
@@ -137,17 +145,14 @@ async def Stop(ctx):
 
 @bot.command()
 async def DelQ(ctx):
-    #if ctx.author.voice.channel == ctx.voice_client:
+    global Waitlist
+    if ctx.author.voice.channel.id == ctx.voice_client.channel.id:
         print(Waitlist)
         Waitlist = []
         print(Waitlist)
         await ctx.send("Waitlist deleted!")
-    #else:
-        #await ctx.send("Not in same Voicechannel!")
-
-#@Next.before_invoke
-#async def ensure_ctx(ctx):
-#    Globalctx = ctx
+    else:
+        await ctx.send("Not in same Voicechannel!")
 
 @Play.before_invoke
 async def ensure_voice(ctx):
