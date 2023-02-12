@@ -134,8 +134,6 @@ async def Play(ctx):
 
         else:
             await ctx.send("Please provide a url.")
-            #vc.play(discord.FFmpegPCMAudio(executable="C:/Program Files/ffmpeg-2022-10-13-git-9e8a327e68-full_build/bin/ffmpeg.exe",
-            #source="C:/Users/hendr/Nextcloud/Musik/coole musik/Frozen Night - II- The Ethereal Forest/Frozen Night - II- The Ethereal Forest - 03 Chrysalis Metamorphosis.mp3"))
     else:
         await ctx.send(str(ctx.author.name) + "is not in a channel.")
     # Delete command after the audio is done playing.
